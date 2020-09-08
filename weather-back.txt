@@ -1,0 +1,189 @@
+/* 
+     Declaring DOM elements
+ */
+const getWeather = document.getElementById("search"),
+    userInput = document.getElementById("user-input"),
+    error = document.getElementById("error"),
+    result = document.getElementById("results"),
+    closeButtons = document.getElementsByClassName("close");
+
+/*
+     Functions:
+ */
+
+const pairCloseButtons = elements => {
+    for (let each of elements) {
+        each.onclick = function () {
+            this.parentElement.classList.remove("fade-in");
+            this.parentElement.classList.add("fade-out");
+            // we want our error div to no longer take up space
+            const displayNone = () => {
+                this.parentElement.style.display = "none";
+            };
+            // if we don't set timeout, we miss our ~BEAUTIFUL~ animation
+            return setTimeout(displayNone, 300);
+        };
+    }
+};
+
+/*
+     Error messages:
+ */
+const showErrors = el => {
+    for (let each of el) {
+        each.style.display = "block";
+    }
+};
+
+/*
+    converting Kelvins to Fahrenheit
+ */
+const convertTemp = K => (1.8 * (K - 273) + 32).toFixed(2);
+
+
+String.prototype.toProperCase = function () {
+    return this.replace(/\w\S*/g, function (txt) {
+        return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+    });
+};
+
+/* ====================
+ * API call will do it for us,
+ * but we should be extra sure and replace
+ * whitespace in city names as %20
+ * ====================
+ */
+String.prototype.fixWhiteSpace = function () {
+    return this.replace(/ /g, "%20");
+};
+
+/*
+	Window / Button Functionality:
+*/
+window.onload = function () {
+    pairCloseButtons(closeButtons);
+};
+
+
+/* ========================================
+ * getWeatherData() => main function for retrieving data.
+ * This function fetches weather data via
+ * API call to OpenWeatherMap (https://openweathermap.org)
+ * We call the API with our city name and public key.
+ * The info we get back is parsed as JSON ( .json() )
+ * We then set up our results div and place in 
+ * The elements we wish to target
+ * ========================================
+ */
+const getWeatherData = () => {
+    let city = userInput.value.trim();
+    let publicKey = `8fd8cd4cfceeb698eef7a7cd4ea325cc`;
+    let lon;
+    let lat;
+    let apiCallCurrentWeather = `http://api.openweathermap.org/data/2.5/weather?q=${city.fixWhiteSpace()}&appid=${publicKey}`;
+    console.log(apiCallCurrentWeather);
+
+    fetch(apiCallCurrentWeather)
+        .then(response => response.json())
+        .catch(e => {
+            console.error(`Retreival error: ${e}`);
+        })
+        .then(data => {
+            /* [0] holds all the most recent info, if we wanted all the info
+			  we could simply cycle through all of the elements.
+        */
+            console.log(data.coord.lon);
+            const lon = data.coord.lon;
+            const lat = data.coord.lat;
+            const cityName = data.name;
+            const country = data.sys.country;
+
+            result.innerHTML = `
+
+            <div><span>City:</span> ${cityName}</div>
+            <div><span>Country:</span> ${country}</div>
+    
+            `;
+
+            // fetching second (one) API
+
+            let apiCallOne = `https://api.openweathermap.org/data/2.5/onecall?lat=${lat}&lon=${lon}&
+            &appid=${publicKey}`;
+
+
+            //second fetch
+
+            fetch(apiCallOne)
+                .then(response => response.json())
+                .catch(e => {
+                    console.error(`Retreival error: ${e}`);
+                })
+                .then(data => {
+
+                   
+
+                    console.log(apiCallOne);
+
+                    const loni = data.timezone;
+
+                    console.log(loni);
+
+                    const resultDiv = document.getElementById("search-result"),
+                        errorDiv = document.getElementById("errorContainer");
+                    errorDiv.style.display = "none"; // if results, no error
+                    resultDiv.style.display = "block"; // if results, display
+                    window.scrollTo(0, 200); //scroll if window is too small to view results.
+
+                    //loop throught days
+
+                    for (let i = 0; i < 7; i++) {
+
+                        const weather = data.daily[i].weather[0].main;
+                        let temp = data.daily[i].temp.day;
+                        temp = convertTemp(temp);
+                        let minTemp = data.daily[i].temp.min;
+                        minTemp = convertTemp(minTemp);
+                        const icon = data.daily[i].weather[0].icon;
+                        // const icon = `https://s3-us-west-2.amazonaws.com/s.cdpn.io/162656/data.daily[i].weather[0].svg`;
+                        console.log(data.daily[i].sunrise);
+
+                        //html 
+                        result.insertAdjacentHTML("afterend", `
+
+                        <div><span>Weather:</span> ${weather}</div>
+                        <div><span>Daily temp:</span> ${temp}</div>
+                        <div><span>Min temp:</span>${minTemp}</div>
+                        <div><img class="city-icon" src="http://openweathermap.org/img/wn/${icon}.png" alt="weather-icon"></div>
+                        <div class="${icon}"></div>
+                        
+                        
+                        `);
+                    }
+
+
+                })
+        })
+        .catch(e => {
+            let resultDiv = document.getElementById("search-result"),
+                errorDiv = document.getElementById("errorContainer"),
+                errorMsg = document.getElementById("error");
+            resultDiv.style.display = "none"; // if error, no results
+            errorDiv.style.display = "block"; // display error
+            errorDiv.classList.remove("fade-out"); // fade animations
+            errorDiv.classList.add("fade-in"); // fade animations
+            errorMsg.innerHTML = `Cannot find: ${city}!`; // display error msg.
+            console.error(`Data Error: ${e} \n city probably does not exist`);
+        });
+
+
+
+};
+//search click
+getWeather.onclick = function () {
+    getWeatherData();
+};
+
+// search enter
+userInput.onkeydown = function (e) {
+    if (e.key === 'Enter') getWeatherData();
+};
